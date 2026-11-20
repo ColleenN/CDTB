@@ -4,8 +4,11 @@ A stopgap equivalent of `cdtb.tftdata` for the Unreal client. It reads the
 champion, trait, item and augment data assets (`DA_*.uasset`) and fills in
 what can be read without a mappings file: names, descriptions, costs,
 roles, traits, item tags and recipes, icons, and the stats stored as
-name/value pairs. Values that come from curve tables (health, attack
-damage, ability and trait numbers) are left as None.
+name/value pairs. Values that come from curve tables (attack damage,
+some health values, ability and trait numbers) are left as None.
+
+Cooked assets omit fields that hold their default value, so a champion
+with no starting mana or attack range stored gets 0 and 1 (melee).
 """
 import fnmatch
 import logging
@@ -24,7 +27,6 @@ COSTS = {"OneCost": 1, "TwoCost": 2, "ThreeCost": 3, "FourCost": 4, "FiveCost": 
 # stat names stored in champion assets -> old en_us.json stat keys
 STAT_KEYS = {
     "Armor": "armor",
-    "AttackDamage": "damage",
     "AttackRange": "range",
     "AttackSpeed": "attackSpeed",
     "CritChance": "critChance",
@@ -41,7 +43,9 @@ OLD_STAT_KEYS = ["armor", "attackSpeed", "critChance", "critMultiplier", "damage
 STAT_PATTERN = re.compile(rb'(?s)([\x02-\x40])\x00\x00\x00([A-Za-z][A-Za-z0-9]*)\x00'
                           rb'\x01\x00\x00\x00.{8}(.{4})(.{4})(.{4})')
 
-TIER_PATTERN = re.compile(r'^\((\d+)\)')
+# "(2) ..." or "2) ..."
+TIER_PATTERN = re.compile(r'^\(?(\d+)\)')
+PLACEHOLDER = "???"
 
 
 def package_path(file_path):
@@ -89,7 +93,8 @@ def read_stats(data):
 
 
 def _plain(text):
-    return '<' not in text and '\n' not in text and '\r' not in text and len(text) <= 60
+    return ('<' not in text and '\n' not in text and '\r' not in text and len(text) <= 60
+            and PLACEHOLDER not in text and not TIER_PATTERN.match(text))
 
 
 class TftAsset:
@@ -122,13 +127,14 @@ class TftAsset:
         return None
 
 
-def _name_and_desc(texts):
+def _name_and_desc(texts, fallback=None):
     """Pick a name (shortest plain text) and description (longest text)"""
     if not texts:
-        return None, None
-    plain = [t for t in texts if _plain(t)]
-    name = min(plain, key=len) if plain else None
+        return fallback, None
     desc = max(texts, key=len)
+    # names are short and aren't sentences; a lone text is a description
+    plain = [t for t in texts if _plain(t) and t != desc and not t.endswith('.')]
+    name = min(plain, key=len) if plain else fallback
     return name, (None if desc == name else desc)
 
 
@@ -142,6 +148,12 @@ def build_champion(asset, traits_by_package):
     for stat, value in read_stats(asset.data).items():
         if stat in STAT_KEYS:
             stats[STAT_KEYS[stat]] = value
+    if stats["armor"] is not None:
+        # omitted because they hold the default value
+        if stats["initialMana"] is None:
+            stats["initialMana"] = 0
+        if stats["range"] is None:
+            stats["range"] = 1
     cost = next((COSTS[n] for n in asset.names if n in COSTS), None)
     role = next((n for n in asset.names if n.startswith("DA_Role_")), None)
     traits = [traits_by_package[p].get("name") for p in asset.imports if p in traits_by_package]
@@ -166,8 +178,8 @@ def build_champion(asset, traits_by_package):
 
 
 def build_trait(asset):
-    tiers = sorted({int(m.group(1)) for t in asset.texts for m in [TIER_PATTERN.match(t)] if m})
-    tier_texts = [t for t in asset.texts if TIER_PATTERN.match(t)]
+    tier_texts = [t for t in asset.texts if TIER_PATTERN.match(t) and PLACEHOLDER not in t]
+    tiers = sorted({int(TIER_PATTERN.match(t).group(1)) for t in tier_texts})
     other = [t for t in asset.texts if not TIER_PATTERN.match(t)]
     name, desc = _name_and_desc(other)
     if tier_texts:
@@ -178,17 +190,18 @@ def build_trait(asset):
         "apiName": asset.api_name,
         "desc": desc,
         "effects": effects,
-        "icon": next((icon_path(t) for t in asset.textures() if "/T_TraitIcon_" in t), None),
+        "icon": icon_path(asset.textures()[0]) if asset.textures() else None,
         "name": name,
     }
 
 
 def build_item(asset, traits_by_package, items_by_package):
-    name, desc = _name_and_desc(asset.texts)
+    name, desc = _name_and_desc(asset.texts, fallback=asset.identifier.rsplit('.', 1)[1])
     tags = [n for n in asset.names if n.startswith(("Item.", "Augment."))]
     associated = [traits_by_package[p].get("name") for p in asset.imports if p in traits_by_package]
+    # augments reference the items they grant, which aren't a recipe
     components = [items_by_package[p].api_name for p in asset.imports
-                  if p in items_by_package and items_by_package[p].kind == "Item"]
+                  if asset.kind == "Item" and p in items_by_package and items_by_package[p].kind == "Item"]
     return {
         "apiName": asset.api_name,
         "associatedTraits": associated,
@@ -225,6 +238,13 @@ def load_assets(containers, strings=None, patterns=("*/DA_*.uasset",)):
             for f in (handles.values() if isinstance(handles, dict) else [handles]):
                 f.close()
     return assets
+
+
+def latest_set(assets):
+    """Return the highest set number with champions, or None"""
+    numbers = [int(m.group(1)) for a in assets if a.kind == "Champion"
+               for m in [re.match(r'/Set_(\d+)/', a.package)] if m]
+    return max(numbers) if numbers else None
 
 
 def build_tft_data(assets, set_number):

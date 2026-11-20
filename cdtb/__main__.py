@@ -19,6 +19,7 @@ from cdtb.unreal import open_container
 from cdtb.unreal.codecs import parse_aes_key
 from cdtb.unreal.locres import LocresFile
 from cdtb.unreal.textkeys import index_containers
+from cdtb.unreal.tftdata import load_assets, latest_set, build_tft_data
 from cdtb.export import CdragonRawPatchExporter
 from cdtb.binfile import BinFile
 from cdtb.sknfile import SknFile
@@ -224,6 +225,33 @@ def command_ue_text_keys(parser, args):
             json.dump(rows, f, ensure_ascii=False, indent=1)
     else:
         json.dump(rows, sys.stdout, ensure_ascii=False, indent=1)
+        print()
+
+
+def command_ue_tft_data(parser, args):
+    import json
+    key = parse_aes_key(args.aes_key) if args.aes_key else None
+    containers = []
+    for path in args.container:
+        if not os.path.isfile(path):
+            parser.error(f"container file does not exist: {path}")
+        containers.append(open_container(path, aes_key=key))
+    strings = None
+    if args.locres:
+        strings = LocresFile()
+        for path in args.locres:
+            strings.update(LocresFile(path))
+    patterns = args.pattern or ["*/DA_*.uasset"]
+    assets = load_assets(containers, strings, patterns)
+    set_number = args.set or latest_set(assets)
+    if set_number is None:
+        parser.error("no champion data found, can't guess the set number")
+    data = build_tft_data(assets, set_number)
+    if args.output:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=1)
+    else:
+        json.dump(data, sys.stdout, ensure_ascii=False, indent=1)
         print()
 
 
@@ -541,6 +569,17 @@ def create_parser():
                            help="output JSON file (default: stdout)")
     subparser.add_argument('container', nargs='+',
                            help=".pak files, or .utoc/.ucas files of IoStore containers (default pattern: *.uasset)")
+
+    subparser = subparsers.add_parser('ue-tft-data', parents=[ue_parser],
+                                      help="build TFT data like CDragon's old cdragon/tft/<lang>.json, as JSON")
+    subparser.add_argument('-l', '--locres', action='append',
+                           help="locres file for localized text, merged in order (default: English source text)")
+    subparser.add_argument('--set', type=int,
+                           help="set number (default: the highest set with champions)")
+    subparser.add_argument('-o', '--output',
+                           help="output JSON file (default: stdout)")
+    subparser.add_argument('container', nargs='+',
+                           help=".pak files, or .utoc/.ucas files of IoStore containers (default pattern: */DA_*.uasset)")
 
     subparser = subparsers.add_parser('hashes-guess', parents=[storage_parser],
                                       help="guess hashes from WAD content")

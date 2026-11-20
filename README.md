@@ -120,3 +120,16 @@ cdtb ue-text-keys -p 'TFT/Plugins/GameFeatures/Set_19/*.uasset' -o set19_text.js
 Gameplay text is keyed by 32-digit IDs generated when the text is
 authored, not by hashes. `ue-text-keys` finds the asset that stores each
 one, e.g. a trait's name in `Set_19/Content/Traits/<Trait>/Trait/DA_<Trait>19.uasset`.
+
+`ue-tft-data` builds a file shaped like CDragon's old `cdragon/tft/<lang>.json`
+(`items`, `setData`, `sets`) from champion, trait, item and augment data
+assets. It's a stopgap: it fills what can be read without a mappings file
+(names, descriptions, costs, roles, traits, tags, icons and flat stats) and
+leaves values that come from curve tables as `null`.
+
+```sh
+cdtb ue-tft-data -o tft19.json \
+    -l out/TFT/Content/Localization/Game/en-US/Game.locres \
+    -l out/TFT/Content/Localization/Game_locchunk1/en-US/Game_locchunk1.locres \
+    TFT/Content/Paks/pakchunk1-WindowsClient.utoc
+```
