@@ -43,8 +43,8 @@ OLD_STAT_KEYS = ["armor", "attackSpeed", "critChance", "critMultiplier", "damage
 STAT_PATTERN = re.compile(rb'(?s)([\x02-\x40])\x00\x00\x00([A-Za-z][A-Za-z0-9]*)\x00'
                           rb'\x01\x00\x00\x00.{8}(.{4})(.{4})(.{4})')
 
-# "(2) ..." or "2) ...", at the start of any line
-TIER_PATTERN = re.compile(r'(?m)^\s*\(?(\d+)\)')
+# "(2) ...", "2) ..." or "(3<img .../>) ...", at the start of any line
+TIER_PATTERN = re.compile(r'(?m)^\s*\(?(\d+)(?:<[^>]*>)*\)')
 PLACEHOLDER = "???"
 
 

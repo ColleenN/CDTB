@@ -47,7 +47,8 @@ def swiftstriker():
     body = (ftext("", "E" * 32, "Swiftstrikers gain attack speed.") + ftext("", "F" * 32, "Swiftstriker")
             + ftext("", "1" * 32, "(2) <TFTCurveTable row=\"AS\"/>") + ftext("", "2" * 32, "(4) more")
             + ftext("", "3" * 32, "3) ???")
-            + ftext("", "9A" * 16, "\r\n<Bright>A-Side</>\r\n6) Even more"))
+            + ftext("", "9A" * 16, "\r\n<Bright>A-Side</>\r\n6) Even more")
+            + ftext("", "9B" * 16, '(8<img id="icon.Star"/>) Most'))
     names = ["Identifier.Trait.Swiftstriker", "/Set_19/Traits/_TraitIcons/T_Swiftstriker19"]
     return zen_asset(names, [], body)
 
@@ -123,7 +124,7 @@ def test_build_tft_data():
     assert traits["DA_EDM19"]["desc"] == "(2) Abilities become stronger."
     trait = traits["DA_Swiftstriker19"]
     assert trait["name"] == "Swiftstriker"
-    assert [(e["minUnits"], e["maxUnits"]) for e in trait["effects"]] == [(2, 3), (4, 5), (6, 25)]
+    assert [(e["minUnits"], e["maxUnits"]) for e in trait["effects"]] == [(2, 3), (4, 5), (6, 7), (8, 25)]
     assert "???" not in trait["desc"] and trait["desc"].startswith("Swiftstrikers gain")
     assert trait["icon"].endswith("t_swiftstriker19.png")
     items = {i["apiName"]: i for i in data["items"]}
