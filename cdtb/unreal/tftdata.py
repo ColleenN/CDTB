@@ -24,16 +24,15 @@ COSTS = {"OneCost": 1, "TwoCost": 2, "ThreeCost": 3, "FourCost": 4, "FiveCost": 
 # stat names stored in champion assets -> old en_us.json stat keys
 STAT_KEYS = {
     "Armor": "armor",
-    "AttackSpeed": "attackSpeed",
-    "MagicResist": "magicResist",
-    "ManaMax": "mana",
-    "ManaStart": "initialMana",
-    "StartingMana": "initialMana",
-    "Health": "hp",
-    "MaxHealth": "hp",
+    "AttackDamage": "damage",
     "AttackRange": "range",
+    "AttackSpeed": "attackSpeed",
     "CritChance": "critChance",
     "CritDamage": "critMultiplier",
+    "HealthMax": "hp",
+    "MagicResist": "magicResist",
+    "ManaMax": "mana",
+    "ManaStarting": "initialMana",
 }
 OLD_STAT_KEYS = ["armor", "attackSpeed", "critChance", "critMultiplier", "damage",
                  "hp", "initialMana", "magicResist", "mana", "range"]
@@ -83,7 +82,8 @@ def read_stats(data):
         if a != b or a >= 0:
             continue
         value, = struct.unpack('<f', m.group(5))
-        if value == value and 0 <= value < 100000:
+        # curve-based stats have other data here, which reads as a tiny or huge float
+        if value == value and (value == 0 or 1e-4 <= value < 100000):
             stats.setdefault(name, round(value, 4))
     return stats
 
