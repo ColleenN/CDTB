@@ -109,4 +109,14 @@ cdtb ue-extract -o out -p '*/en-US/*.locres' TFT/Content/Paks/pakchunk0-WindowsC
 cdtb ue-extract -o out -p '*/en-US/*.locres' TFT/Content/Paks/pakchunk1-WindowsClient.pak
 cdtb locres-dump -o strings.json out/TFT/Content/Localization/Game/en-US/Game.locres \
     out/TFT/Content/Localization/Game_locchunk1/en-US/Game_locchunk1.locres
+
+# list the localized text stored in Set 19 assets, with English strings
+cdtb ue-text-keys -p 'TFT/Plugins/GameFeatures/Set_19/*.uasset' -o set19_text.json \
+    -l out/TFT/Content/Localization/Game/en-US/Game.locres \
+    -l out/TFT/Content/Localization/Game_locchunk1/en-US/Game_locchunk1.locres \
+    TFT/Content/Paks/pakchunk1-WindowsClient.utoc
 ```
+
+Gameplay text is keyed by 32-digit IDs generated when the text is
+authored, not by hashes. `ue-text-keys` finds the asset that stores each
+one, e.g. a trait's name in `Set_19/Content/Traits/<Trait>/Trait/DA_<Trait>19.uasset`.
