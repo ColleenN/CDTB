@@ -81,3 +81,32 @@ lot of unresolved hashes.
 An hash list is provided and regularly updated with new hashes as they are
 discovered, especially after client updates.
 
+
+## Unreal files (standalone TFT client)
+
+The standalone TFT client is built on Unreal Engine. Its files are stored in
+`.pak` files and IoStore containers (a `.utoc` index with `.ucas` data) under
+`TFT/Content/Paks/`, instead of WADs. Paths are stored in clear, so no hash
+lists are needed, but containers are usually encrypted with an AES-256 key
+and compressed with Oodle.
+
+Oodle has no Python implementation. Set `CDTB_OODLE_LIB` to a shared library
+that provides it: Epic's `oo2core` library, or a build of the open-source
+[ooz](https://github.com/zao/ooz) (`libooz`).
+
+```sh
+export CDTB_AES_KEY=0x0123...   # 64 hex digits
+export CDTB_OODLE_LIB=/path/to/libooz.so
+
+# list files of a container (a .pak, or the .utoc/.ucas of an IoStore container)
+cdtb ue-list TFT/Content/Paks/pakchunk1-WindowsClient.utoc
+
+# extract files matching a pattern
+cdtb ue-extract -o out -p 'TFT/Plugins/GameFeatures/Set_19/*' TFT/Content/Paks/pakchunk1-WindowsClient.utoc
+
+# extract English string tables, then dump them as one JSON file
+cdtb ue-extract -o out -p '*/en-US/*.locres' TFT/Content/Paks/pakchunk0-WindowsClient.pak
+cdtb ue-extract -o out -p '*/en-US/*.locres' TFT/Content/Paks/pakchunk1-WindowsClient.pak
+cdtb locres-dump -o strings.json out/TFT/Content/Localization/Game/en-US/Game.locres \
+    out/TFT/Content/Localization/Game_locchunk1/en-US/Game_locchunk1.locres
+```

@@ -15,6 +15,9 @@ from cdtb.storage import (
     storage_conf_from_path,
 )
 from cdtb.wad import Wad
+from cdtb.unreal import open_container
+from cdtb.unreal.codecs import parse_aes_key
+from cdtb.unreal.locres import LocresFile
 from cdtb.export import CdragonRawPatchExporter
 from cdtb.binfile import BinFile
 from cdtb.sknfile import SknFile
@@ -155,6 +158,49 @@ def command_wad_list(parser, args):
     wadfiles = [(wf.path or ('?.%s' % wf.ext if wf.ext else '?'), wf.path_hash) for wf in wad.files]
     for path, h in sorted(wadfiles):
         print(f"{h:016x} {path}")
+
+
+def open_ue_container(parser, args):
+    if not os.path.isfile(args.container):
+        parser.error("container file does not exist")
+    key = parse_aes_key(args.aes_key) if args.aes_key else None
+    try:
+        return open_container(args.container, aes_key=key)
+    except ValueError as e:
+        parser.error(str(e))
+
+
+def command_ue_list(parser, args):
+    container = open_ue_container(parser, args)
+    entries = container.find(*args.pattern) if args.pattern else container.entries
+    for entry in sorted(entries, key=lambda e: e.path):
+        size = entry.uncompressed_size if hasattr(entry, 'uncompressed_size') else entry.length
+        print(f"{size:>10} {entry.path}")
+
+
+def command_ue_extract(parser, args):
+    container = open_ue_container(parser, args)
+    if not args.output:
+        args.output = os.path.splitext(args.container)[0]
+    if os.path.exists(args.output) and not os.path.isdir(args.output):
+        parser.error("output is not a directory")
+    entries = container.find(*args.pattern) if args.pattern else container.entries
+    container.extract(args.output, entries, overwrite=not args.lazy)
+
+
+def command_locres_dump(parser, args):
+    import json
+    table = LocresFile()
+    for path in args.locres:
+        if not os.path.isfile(path):
+            parser.error(f"locres file does not exist: {path}")
+        table.update(LocresFile(path))
+    if args.output:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(table.entries, f, ensure_ascii=False, indent=1)
+    else:
+        json.dump(table.entries, sys.stdout, ensure_ascii=False, indent=1)
+        print()
 
 
 def command_hashes_guess(parser, args):
@@ -353,6 +399,8 @@ def create_parser():
             Environment variables
 
               CDTB_STORAGE     default `--storage` value
+              CDTB_AES_KEY     default `--aes-key` value for Unreal containers
+              CDTB_OODLE_LIB   path to an Oodle library (oo2core or ooz), for Unreal containers
               CDTB_EXPORT      default 'export --output` value
               CDTB_HASHES_DIR  path to directory with hash files
               CDRAGON_DATA               path to `Data` repository, for hash files
@@ -431,6 +479,35 @@ def create_parser():
                            help="hashes of known paths")
     subparser.add_argument('wad',
                            help="WAD file to list")
+
+    # Unreal commands (standalone TFT client)
+
+    ue_parser = argparse.ArgumentParser(add_help=False)
+    ue_parser.add_argument('-k', '--aes-key', default=os.environ.get('CDTB_AES_KEY'),
+                           help="AES-256 key for encrypted containers, in hex (default: $CDTB_AES_KEY)")
+    ue_parser.add_argument('-p', '--pattern', action='append',
+                           help="only use files matching pattern with shell-like wildcards")
+
+    subparser = subparsers.add_parser('ue-list', parents=[ue_parser],
+                                      help="list the content of an Unreal .pak or IoStore container")
+    subparser.add_argument('container',
+                           help=".pak file, or .utoc/.ucas file of an IoStore container")
+
+    subparser = subparsers.add_parser('ue-extract', parents=[ue_parser],
+                                      help="extract an Unreal .pak or IoStore container")
+    subparser.add_argument('-o', '--output',
+                           help="extract directory")
+    subparser.add_argument('--lazy', action='store_true',
+                           help="don't overwrite files, assume they are already correctly extracted")
+    subparser.add_argument('container',
+                           help=".pak file, or .utoc/.ucas file of an IoStore container")
+
+    subparser = subparsers.add_parser('locres-dump',
+                                      help="dump Unreal .locres string tables as JSON")
+    subparser.add_argument('-o', '--output',
+                           help="output JSON file (default: stdout)")
+    subparser.add_argument('locres', nargs='+',
+                           help="locres files, merged in order (e.g. Game.locres then its loc chunks)")
 
     subparser = subparsers.add_parser('hashes-guess', parents=[storage_parser],
                                       help="guess hashes from WAD content")
