@@ -43,8 +43,8 @@ OLD_STAT_KEYS = ["armor", "attackSpeed", "critChance", "critMultiplier", "damage
 STAT_PATTERN = re.compile(rb'(?s)([\x02-\x40])\x00\x00\x00([A-Za-z][A-Za-z0-9]*)\x00'
                           rb'\x01\x00\x00\x00.{8}(.{4})(.{4})(.{4})')
 
-# "(2) ..." or "2) ..."
-TIER_PATTERN = re.compile(r'^\(?(\d+)\)')
+# "(2) ..." or "2) ...", at the start of any line
+TIER_PATTERN = re.compile(r'(?m)^\s*\(?(\d+)\)')
 PLACEHOLDER = "???"
 
 
@@ -94,7 +94,7 @@ def read_stats(data):
 
 def _plain(text):
     return ('<' not in text and '\n' not in text and '\r' not in text and len(text) <= 60
-            and PLACEHOLDER not in text and not TIER_PATTERN.match(text))
+            and PLACEHOLDER not in text and not TIER_PATTERN.search(text))
 
 
 class TftAsset:
@@ -183,9 +183,9 @@ def build_champion(asset, traits_by_package):
 
 
 def build_trait(asset):
-    tier_texts = [t for t in asset.texts if TIER_PATTERN.match(t) and PLACEHOLDER not in t]
-    tiers = sorted({int(TIER_PATTERN.match(t).group(1)) for t in tier_texts})
-    other = [t for t in asset.texts if not TIER_PATTERN.match(t)]
+    tier_texts = [t for t in asset.texts if TIER_PATTERN.search(t) and PLACEHOLDER not in t]
+    tiers = sorted({int(n) for t in tier_texts for n in TIER_PATTERN.findall(t)})
+    other = [t for t in asset.texts if not TIER_PATTERN.search(t)]
     name, desc = _name_and_desc(other)
     if tier_texts:
         desc = "\n".join(([desc] if desc else []) + tier_texts)
