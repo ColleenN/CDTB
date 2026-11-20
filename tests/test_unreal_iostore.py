@@ -21,7 +21,7 @@ def encrypt(data):
     return AES.new(KEY, AES.MODE_ECB).encrypt(data)
 
 
-def build_directory_index(paths):
+def build_directory_index(paths, mount_point="../../../"):
     """Build the directory tree; `paths` maps file path to TOC index"""
     tree = {}
     for path, toc_index in paths.items():
@@ -62,14 +62,14 @@ def build_directory_index(paths):
         return index
 
     add_dir(None, tree)
-    out = fstring("../../../")
+    out = fstring(mount_point)
     out += struct.pack('<i', len(dirs)) + b''.join(struct.pack('<4I', *d) for d in dirs)
     out += struct.pack('<i', len(files)) + b''.join(struct.pack('<3I', *f) for f in files)
     out += struct.pack('<i', len(strings)) + b''.join(fstring(s) for s in strings)
     return out
 
 
-def build_container(tmp_path, files, *, encrypted, compress=True):
+def build_container(tmp_path, files, *, encrypted, compress=True, mount_point="../../../"):
     """Write test.utoc and test.ucas; `files` maps path to content"""
     chunk_ids, offsets, blocks = b'', b'', b''
     cas = bytearray()
@@ -91,7 +91,7 @@ def build_container(tmp_path, files, *, encrypted, compress=True):
         while len(blocks) // 12 < position // BLOCK_SIZE:
             blocks += len(cas).to_bytes(5, 'little') + b'\0' * 7
 
-    dir_index = build_directory_index(paths)
+    dir_index = build_directory_index(paths, mount_point)
     if encrypted:
         dir_index = encrypt(dir_index)
     flags = 1 | 8 | (2 if encrypted else 0)
@@ -124,6 +124,14 @@ def test_iostore_list_and_read(tmp_path, encrypted, compress):
     assert sorted(e.path for e in reader.entries) == sorted(FILES)
     for entry in reader.entries:
         assert reader.read(entry) == FILES[entry.path]
+
+
+def test_iostore_paths_include_mount_point(tmp_path):
+    # plugin containers mount below the game root
+    utoc = build_container(tmp_path, {"UI_19/Content/a.uasset": b"x"}, encrypted=False,
+                           mount_point="../../../TFT/Plugins/GameFeatures/")
+    reader = IoStoreReader(utoc)
+    assert [e.path for e in reader.entries] == ["TFT/Plugins/GameFeatures/UI_19/Content/a.uasset"]
 
 
 def test_iostore_chunk_ids(tmp_path):

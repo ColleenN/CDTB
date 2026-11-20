@@ -108,8 +108,12 @@ class IoStoreReader:
             s, pos = read_fstring(buf, pos)
             strings.append(s)
 
+        # paths are made relative to the game root, like pak paths
+        root = self.mount_point
+        while root.startswith("../"):
+            root = root[3:]
         # each stack item is the first directory of a sibling list, and their parent's path
-        stack = [(0, "")] if dirs else []
+        stack = [(0, root)] if dirs else []
         while stack:
             d, parent = stack.pop()
             while d != INVALID:
