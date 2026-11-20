@@ -18,6 +18,7 @@ from cdtb.wad import Wad
 from cdtb.unreal import open_container
 from cdtb.unreal.codecs import parse_aes_key
 from cdtb.unreal.locres import LocresFile
+from cdtb.unreal.textkeys import index_containers
 from cdtb.export import CdragonRawPatchExporter
 from cdtb.binfile import BinFile
 from cdtb.sknfile import SknFile
@@ -200,6 +201,29 @@ def command_locres_dump(parser, args):
             json.dump(table.entries, f, ensure_ascii=False, indent=1)
     else:
         json.dump(table.entries, sys.stdout, ensure_ascii=False, indent=1)
+        print()
+
+
+def command_ue_text_keys(parser, args):
+    import json
+    key = parse_aes_key(args.aes_key) if args.aes_key else None
+    containers = []
+    for path in args.container:
+        if not os.path.isfile(path):
+            parser.error(f"container file does not exist: {path}")
+        containers.append(open_container(path, aes_key=key))
+    table = None
+    if args.locres:
+        table = LocresFile()
+        for path in args.locres:
+            table.update(LocresFile(path))
+    refs = index_containers(containers, args.pattern or ["*.uasset"])
+    rows = [r.to_dict(table) for r in sorted(refs, key=lambda r: (r.asset, r.key))]
+    if args.output:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(rows, f, ensure_ascii=False, indent=1)
+    else:
+        json.dump(rows, sys.stdout, ensure_ascii=False, indent=1)
         print()
 
 
@@ -508,6 +532,15 @@ def create_parser():
                            help="output JSON file (default: stdout)")
     subparser.add_argument('locres', nargs='+',
                            help="locres files, merged in order (e.g. Game.locres then its loc chunks)")
+
+    subparser = subparsers.add_parser('ue-text-keys', parents=[ue_parser],
+                                      help="list the localized text stored in Unreal assets, as JSON")
+    subparser.add_argument('-l', '--locres', action='append',
+                           help="locres file to add localized strings from, merged in order (repeatable)")
+    subparser.add_argument('-o', '--output',
+                           help="output JSON file (default: stdout)")
+    subparser.add_argument('container', nargs='+',
+                           help=".pak files, or .utoc/.ucas files of IoStore containers (default pattern: *.uasset)")
 
     subparser = subparsers.add_parser('hashes-guess', parents=[storage_parser],
                                       help="guess hashes from WAD content")
