@@ -18,6 +18,7 @@ dependencies = [
   "pyzstd",
   "Pillow",
   "ujson",
+  "pycryptodome",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
