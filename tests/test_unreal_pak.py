@@ -20,7 +20,7 @@ def encrypt(data):
     return AES.new(KEY, AES.MODE_ECB).encrypt(data)
 
 
-def build_pak(files, *, encrypted, block_size=2048, version=11):
+def build_pak(files, *, encrypted, block_size=2048, version=11, empty_first_method=False):
     """Build a pak in the same layout Unreal writes: data, index, directory index, footer
 
     `files` maps path to (content, compress).
@@ -79,7 +79,10 @@ def build_pak(files, *, encrypted, block_size=2048, version=11):
 
     footer = b'\0' * 16 + bytes([int(encrypted)])
     footer += struct.pack('<IiQQ', PAK_MAGIC, version, index_offset, len(index)) + b'\0' * 20
-    footer += b'Zlib'.ljust(32, b'\0') + b'\0' * 4 * 32
+    if empty_first_method:
+        footer += b'\0' * 32 + b'Zlib'.ljust(32, b'\0') + b'\0' * 3 * 32
+    else:
+        footer += b'Zlib'.ljust(32, b'\0') + b'\0' * 4 * 32
     return bytes(data + footer)
 
 
@@ -103,6 +106,15 @@ def test_pak_list_and_read(tmp_path, encrypted):
     assert pak.read(by_path["TFT/Content/a.bin"]) == CONTENT
     assert pak.read(by_path["TFT/Content/Sub/b.txt"]) == b"hello pak"
     assert pak.read(by_path["TFT/c.bin"]) == CONTENT[:1000]
+
+
+def test_pak_skips_empty_method_slots(tmp_path):
+    # the TFT client leaves the first method name slot empty
+    path = tmp_path / "test.pak"
+    path.write_bytes(build_pak({"a/b.bin": (CONTENT, True)}, encrypted=False, empty_first_method=True))
+    pak = PakFile(path)
+    assert pak.methods == ["None", "Zlib"]
+    assert pak.read(pak.entries[0]) == CONTENT
 
 
 def test_pak_encrypted_requires_key(tmp_path):

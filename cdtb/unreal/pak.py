@@ -73,7 +73,9 @@ class PakFile:
             raise ValueError(f"unsupported pak version {version}")
         self.version = version
         names = footer[FOOTER_SIZE - 5 * 32:]
-        self.methods = ["None"] + [names[i:i + 32].rstrip(b'\0').decode() for i in range(0, 5 * 32, 32)]
+        names = [names[i:i + 32].rstrip(b'\0').decode() for i in range(0, 5 * 32, 32)]
+        # like Unreal, skip empty slots: entries index into the non-empty names
+        self.methods = ["None"] + [n for n in names if n]
 
         index = self._read_maybe_encrypted(f, index_offset, index_size, encrypted_index)
         self.mount_point, pos = read_fstring(index, 0)
