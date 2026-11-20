@@ -134,7 +134,12 @@ def _name_and_desc(texts, fallback=None):
     desc = max(texts, key=len)
     # names are short and aren't sentences; a lone text is a description
     plain = [t for t in texts if _plain(t) and t != desc and not t.endswith('.')]
-    name = min(plain, key=len) if plain else fallback
+    if plain:
+        name = min(plain, key=len)
+    elif _plain(desc) and not desc.endswith('.'):
+        name = desc
+    else:
+        name = fallback
     return name, (None if desc == name else desc)
 
 

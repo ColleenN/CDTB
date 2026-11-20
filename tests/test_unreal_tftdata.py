@@ -51,6 +51,12 @@ def swiftstriker():
     return zen_asset(names, [], body)
 
 
+def edm():
+    # a trait whose only text besides its tiers is its name
+    body = ftext("", "9" * 32, "EDM") + ftext("", "0" * 32, "(2) Abilities become stronger.")
+    return zen_asset(["Identifier.Trait.EDM", "/Set_19/Traits/_TraitIcons/T_EDM19"], [], body)
+
+
 def emblem():
     body = ftext("", "4" * 32, "The holder gains the Swiftstriker trait.") + ftext("", "5" * 32, "Swiftstriker Emblem")
     names = ["Identifier.Item.SwiftstrikerEmblem", "Item.Equippable.Item.Emblem",
@@ -72,6 +78,7 @@ def component():
 ASSETS = {
     f"{SET}/Champions/Locke/DA_Locke19.uasset": locke,
     f"{SET}/Traits/Swiftstriker/Trait/DA_Swiftstriker19.uasset": swiftstriker,
+    f"{SET}/Traits/EDM/Trait/DA_EDM19.uasset": edm,
     f"{SET}/Traits/Swiftstriker/Emblem/DA_Swiftstriker19_Emblem.uasset": emblem,
     "TFT/Plugins/GameFeatures/Item_Shared/Content/Augment/StrangeDuet/DA_StrangeDuet.uasset": augment,
     "TFT/Plugins/GameFeatures/Item_Shared/Content/Item/Component_BFSword/DA_Component_BFSword.uasset": component,
@@ -110,7 +117,10 @@ def test_build_tft_data():
     assert champ["squareIcon"].endswith("t_19_locke_teamplanner_portrait.png")
     assert champ["stats"] == {"armor": 65.0, "attackSpeed": 0.9, "critChance": None, "critMultiplier": None,
                               "damage": None, "hp": None, "initialMana": 0, "magicResist": 65.0, "mana": 30.0, "range": 1}
-    [trait] = s["traits"]
+    traits = {t["apiName"]: t for t in s["traits"]}
+    assert traits["DA_EDM19"]["name"] == "EDM"
+    assert traits["DA_EDM19"]["desc"] == "(2) Abilities become stronger."
+    trait = traits["DA_Swiftstriker19"]
     assert trait["name"] == "Swiftstriker"
     assert [(e["minUnits"], e["maxUnits"]) for e in trait["effects"]] == [(2, 3), (4, 25)]
     assert "???" not in trait["desc"] and trait["desc"].startswith("Swiftstrikers gain")
